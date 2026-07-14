@@ -266,10 +266,27 @@ npm run test:regression:android:profile:30s
 - [ ] 持续监控模式（实时卡顿监视）
 - [ ] 集成测试运行器（含性能基线对比）
 - [ ] Shader 编译卡顿检测
-- [ ] 发布到 npm（支持 `npx flutter-devtools-mcp`）
+- [x] 发布到 npm（支持 `npx flutter-devtools-mcp`）
 
 
 
-## 8. License
+## 8. 发版（GitHub Actions → npm）
+
+1. 仓库 Settings → Secrets and variables → Actions，新增 **`NPM_TOKEN`**（[npm Access Tokens](https://www.npmjs.com/settings/~/tokens) 选 Automation）
+2. 改版本并提交：
+   ```bash
+   cd flutter-devtools-mcp
+   npm version patch   # 0.3.0 → 0.3.1，会改 package.json 并打 git tag
+   git push origin main --tags
+   ```
+3. GitHub → **Releases** → Draft a new release，Tag 选刚推的 `v0.3.1` → Publish  
+   → 自动跑 [`.github/workflows/publish-npm.yml`](../.github/workflows/publish-npm.yml) 发布到 npmjs.com  
+   也可在 Actions 里对 **Publish npm** 点 Run workflow 手动触发。
+
+> Tag 版本（去掉前缀 `v`）必须与 `package.json` 的 `version` 一致。
+
+
+
+## 9. License
 
 MIT

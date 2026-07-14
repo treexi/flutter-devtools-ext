@@ -1,0 +1,90 @@
+# 发布 flutter-devtools-mcp 到 npmjs.com
+#
+# 用法（二选一）：
+# 1) GitHub → Releases → Draft a new release，Tag 填 v0.3.1（须与 package.json version 一致），Publish
+# 2) Actions → Publish npm → Run workflow（可选手动填 version）
+#
+# 仓库 Secrets 需配置：
+#   NPM_TOKEN = npmjs.com 的 Automation / Publish token
+name: Publish npm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "可选：校验用 tag，如 v0.3.1（留空则只按 package.json 发版）"
+        required: false
+        type: string
+
+defaults:
+  run:
+    working-directory: flutter-devtools-mcp
+
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+          cache: npm
+          cache-dependency-path: flutter-devtools-mcp/package-lock.json
+
+      - name: Install
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Build
+        run: npm run build
+
+      - name: Resolve version
+        id: ver
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "pkg=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "package.json version=$PKG_VERSION"
+
+          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          if [ -n "$TAG" ]; then
+            TAG_VERSION="${TAG#v}"
+            echo "tag=$TAG_VERSION" >> "$GITHUB_OUTPUT"
+            echo "release/input tag=$TAG → $TAG_VERSION"
+            if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+              echo "::error::Tag 版本 ($TAG_VERSION) 与 package.json ($PKG_VERSION) 不一致。请先改 version 再发 Release。"
+              exit 1
+            fi
+          fi
+
+      - name: Check not already published
+        run: |
+          PKG_VERSION="${{ steps.ver.outputs.pkg }}"
+          if npm view "flutter-devtools-mcp@$PKG_VERSION" version 2>/dev/null; then
+            echo "::error::flutter-devtools-mcp@$PKG_VERSION 已在 npm 存在，请 bump version。"
+            exit 1
+          fi
+          echo "OK: $PKG_VERSION 尚未发布"
+
+      - name: Publish
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "### Published" >> "$GITHUB_STEP_SUMMARY"
+          echo "- package: \`flutter-devtools-mcp@${{ steps.ver.outputs.pkg }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- npm: https://www.npmjs.com/package/flutter-devtools-mcp" >> "$GITHUB_STEP_SUMMARY"
