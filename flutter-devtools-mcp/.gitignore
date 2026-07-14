@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.js.map
+.DS_Store
+*.tsbuildinfo
+debug-raw.ts
+test-client.ts
+test-screenshot.ts
+demo-output.ts
+performance-reports/
+performance-sessions/

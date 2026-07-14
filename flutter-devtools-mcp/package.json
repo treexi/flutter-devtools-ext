@@ -1,0 +1,55 @@
+{
+  "name": "flutter-devtools-mcp",
+  "version": "0.3.0",
+  "description": "MCP server that connects AI agents to Flutter DevTools for runtime inspection, profiling, and debugging of Flutter applications",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "flutter-devtools-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test:regression": "node scripts/regression-performance-session.mjs",
+    "test:regression:spawn": "node scripts/regression-performance-session.mjs --spawn",
+    "test:regression:android": "FLUTTER_DEVICE=android node scripts/regression-performance-session.mjs --spawn",
+    "test:regression:android:profile": "FLUTTER_DEVICE=android FLUTTER_RUN_MODE=profile node scripts/regression-performance-session.mjs --spawn",
+    "test:regression:android:profile:30s": "FLUTTER_DEVICE=android FLUTTER_RUN_MODE=profile REGRESSION_DURATION_SEC=30 node scripts/regression-performance-session.mjs --spawn",
+    "test:regression:ios": "FLUTTER_DEVICE=ios node scripts/regression-performance-session.mjs --spawn",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "flutter",
+    "devtools",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "debugging",
+    "profiling",
+    "dart",
+    "vm-service",
+    "cursor",
+    "claude"
+  ],
+  "author": "Dragan Bajic",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/draganbajic/flutter-devtools-mcp"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "ws": "^8.18.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "@types/ws": "^8.18.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
