@@ -1,6 +1,6 @@
 {
   "name": "flutter-devtools-mcp",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "MCP server that connects AI agents to running Flutter apps via the Dart VM Service for runtime inspection, profiling, and debugging",
   "type": "module",
   "main": "dist/index.js",
