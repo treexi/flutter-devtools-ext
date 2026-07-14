@@ -9,7 +9,7 @@
 ## 1. 推荐用法（两分钟）
 
 ```bash
-# 1) 性能主采（帧 / 业务CPU / GC / 图片解码更准）
+# 1) 性能主采（帧 / 耗时函数 / GC / 图片解码更准）
 flutter run --profile
 
 # 2) AI 对话
@@ -56,7 +56,7 @@ flutter run --profile
 | **滚动段 FPS / 段 jank** | 2s 窗口分段 | 滑动 <50FPS 或段 jank 高 | 列表滑动卡顿 |
 | **Build / Layout / Paint max** | Timeline 阶段 | 单阶段经常 >8～16ms | 卡在 build / 布局 / 绘制哪一段 |
 
-**限制**：Android profile 下 Timeline 帧事件偶发偏少 → 摘要可能 ⚪无数据，此时以 **业务CPU / 图片解码** 为准。
+**限制**：Android profile 下 Timeline 帧事件偶发偏少 → 摘要可能 ⚪无数据，此时以 **耗时函数 / 图片解码** 为准。
 
 ### 3.2 归因：卡在哪
 
@@ -64,7 +64,7 @@ flutter run --profile
 |------|------|------------|------|
 | **耗时函数 Top（lib/）** | VM `getCpuSamples` + 路径过滤；**Self >20ms → 🔴异常** | 哪个业务方法占时间 | 比框架 `drawFrame` 有用；框架热点不进开发者结论 |
 | **Widget 重建 Top** | inspector 扩展 | 哪个组件重建过多、文件:行号 | **仅 debug**；profile 固定 ⚪无数据 |
-| **filesToInspect** | 重建 + 业务CPU 文件 | 该打开哪些源码 | AI/人工优先读这些文件 |
+| **filesToInspect** | 重建 + 耗时函数 文件 | 该打开哪些源码 | AI/人工优先读这些文件 |
 
 ### 3.3 尖刺：偶发卡一下
 
@@ -102,7 +102,7 @@ flutter run --profile
 **能发现：**
 
 1. **卡顿尖刺来自 GC**：最长经常 >16～32ms，或 >8ms 很多次  
-2. **分配偏勤（间接）**：次数极高 → 短命对象多（临时 List、字符串、闭包、解码缓冲）；需结合业务CPU/重建  
+2. **分配偏勤（间接）**：次数极高 → 短命对象多（临时 List、字符串、闭包、解码缓冲）；需结合耗时函数/重建  
 3. **交叉验证**：与 setState / 热循环 / 大图同时出现时，GC 高往往是副作用  
 
 **发现不了：**
@@ -131,7 +131,8 @@ flutter run --profile
 **推荐**：全站网络图走统一入口 [`AppNetworkImage`](../examples/app_network_image.dart)：
 
 - Timeline 事件名：`app.imageDecode`
-- arguments：`url`（必填），`width` / `height` / `bytes`（可选）
+- arguments：`url`（必填），**`ms`（必填，Stopwatch 耗时）**，`width` / `height` / `bytes`（可选）
+- 跨 `await` 时 B/E 常丢时长，样板用 instant + `args.ms`；MCP 优先读该字段
 
 报告示例：
 
@@ -162,11 +163,12 @@ flutter run --profile
 
 ---
 
-## 7. 业务 CPU 为什么曾为空 / 怎么读
+## 7. 耗时函数为什么曾为空 / 怎么读
 
 - 过滤规则：业务 `lib/` / `package:<app>/`，排除 Flutter SDK、`dart:ui` 等误归一路径  
 - Android profile 下 Self 时间常落在框架叶子；业务方法靠采样 + 路径/符号命中  
 - Demo 可用 `Timeline` / `@pragma('vm:never-inline')` 提高命中率  
+- **Self >20ms → 报告标 🔴异常**  
 - **看 `projectTopFunctions`，不要看框架 `topFunctions` 当根因**
 
 ---
@@ -176,7 +178,7 @@ flutter run --profile
 ```text
 1. 开发者结论里的 P0
 2. 🔴 行：图片解码（带 URL）/ 高 jank / 滚动最差段
-3. 业务CPU Top → 打开 filesToInspect
+3. 耗时函数 Top → 打开 filesToInspect
 4. 🟡 GC / 内存 → 当旁证，回到分配与重建
 5. debug 补采重建（若怀疑 setState 风暴）
 ```
@@ -190,18 +192,6 @@ flutter run --profile
 | [performance-session-simple-design.md](./performance-session-simple-design.md) | 产品形态、工具参数、数据结构、AI 话术 |
 | [performance-audit-requirements.md](./performance-audit-requirements.md) | 重型 MD/HTML 审计（P2 规划，非当前主路径） |
 | [../examples/app_network_image_README.md](../examples/app_network_image_README.md) | 图片统一入口接入 |
-| [../README.zh-CN.md](../README.zh-CN.md) | 安装、回归命令、工具清单 |
-
----
-
-## 10. 回归
-
-```bash
-cd flutter-devtools-mcp
-npm run build
-npm run test:regression:android:profile
-# 或 30s：
-npm run test:regression:android:profile:30s
-```
+| [../README.zh-CN.md](../README.zh-CN.md) | 安装、MCP 配置（npx）、工具清单、发版 |
 
 报告默认落在 Flutter 工程下：`performance-sessions/*.json` + `*.ai.md`。

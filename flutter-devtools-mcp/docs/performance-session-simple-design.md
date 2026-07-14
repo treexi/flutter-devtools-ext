@@ -1,6 +1,6 @@
-# Flutter 性能采集会话 — 方案设计（两轮对话）
+# Flutter 性能采集会话 — 方案设计
 
-> **产品形态**：用户用两句话完成一次采集；MCP 负责采数据；AI 负责结合代码出优化方案。  
+> **产品形态**：用户一句话完成一次采集；MCP 负责采数据；AI 负责结合代码出优化方案。  
 > **优先级**：本方案为 P0；[`performance-audit-requirements.md`](./performance-audit-requirements.md) 中的重型报告降为 P2 可选。  
 > **指标怎么读（开发者）**：见 [`performance-metrics-guide.md`](./performance-metrics-guide.md)。
 
@@ -61,9 +61,9 @@ sequenceDiagram
 
 | 角色 | 职责 | 不做 |
 |------|------|------|
-| **你** | `flutter run --profile`；两轮对话；App 内操作 30s | 不调 MCP 工具名 |
-| **MCP** | 连接 VM；并行采集；`stop` 时输出结构化 JSON | 不调 LLM；不读源码 |
-| **AI** | 解析人话 → 调工具；`stop` 后读代码 → 写优化方案 | 不代替你在 App 里操作 |
+| **你** | `flutter run`；一句话触发采集；App 内操作约 30s | 不调 MCP 工具名 |
+| **MCP** | 连接 VM；并行采集；时长到后输出结构化 JSON + `.ai.md` | 不调 LLM；不读源码 |
+| **AI** | 解析人话 → 调工具；返回后读代码 → 写优化方案 | 不代替你在 App 里操作 |
 
 ---
 
@@ -84,7 +84,7 @@ AI **必须依次**：
 
 ## 5. MCP 工具设计
 
-### 5.1 沿用现有（第一轮会用到）
+### 5.1 连接类（采集前）
 
 | 工具 | 用途 |
 |------|------|
@@ -337,10 +337,11 @@ interface PerformanceSessionResult {
 ## 9. 前置条件
 
 ```bash
-# 终端 1：启动 App（推荐 profile）
+# 终端：启动 App（推荐 profile；需要重建追踪用 debug）
 flutter run --profile
 
-# Cursor：配置 MCP 指向 dist/index.js
+# Cursor / Claude：MCP 用 npx（见 README.zh-CN §2.3）
+# command: npx , args: ["-y", "flutter-devtools-mcp"]
 # 工作区：打开 Flutter 项目根目录（AI 才能读 lib/）
 ```
 
@@ -351,37 +352,18 @@ flutter run --profile
 | 情况 | AI 回复要点 |
 |------|-------------|
 | 未发现 App | 提示先 `flutter run`，或粘贴 VM URI |
-| 重复 start | 先说「已在采集中」，或先 stop 再 start |
-| 未 start 就 stop | 提示先执行第一轮话术 |
-| 采集 < 5s | 警告数据可能不足，建议重新采 30s |
+| 采集时长过短 | 警告数据可能不足，建议重新采 30s |
 | 网络为空 | 说明可能未走 dart:io，其他维度仍给方案 |
+| profile 无重建 | 说明平台限制，需要时 debug 补采 |
 
 ---
 
 ## 11. 验收标准
 
-1. 第一轮话术后，MCP 返回「已开始采集」
-2. 操作 30s 后第二轮话术，`stop` 返回合法 JSON
-3. JSON 含 `topRebuilds[].line`、`topFunctions[].file`、`hintsForAnalysis`
-4. AI 能根据 `filesToInspect` 打开对应 dart 文件并输出 P0/P1 方案
-5. 原有 21 个工具行为不变
-
----
-
-## 13. 回归命令（当前）
-
-```bash
-# Android debug 回归
-npm run test:regression:android
-
-# Android profile 回归（默认时长）
-npm run test:regression:android:profile
-
-# Android profile 回归（30s）
-npm run test:regression:android:profile:30s
-```
-
-> 说明：profile 模式不支持 Widget 重建追踪；帧数偶发偏低时，以 `vm-samples` + 网络 + AI 规则分析为准。
+1. 一句话术后，`collect_performance_session` 阻塞约 30s 并返回合法 JSON + `.ai.md`
+2. JSON 含运行时摘要字段、`filesToInspect`、`projectTopFunctions`（耗时函数）等
+3. AI 能根据 `filesToInspect` 打开对应 dart 文件并输出 P0/P1 方案
+4. 原有独立工具行为不变（加上会话工具共 22 个）
 
 ---
 

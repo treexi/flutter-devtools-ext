@@ -15,7 +15,8 @@ Connect AI agents to running Flutter apps for runtime inspection, profiling, and
 
 - Auto-discover and connect to running Flutter apps
 - Inspect widget tree and locate rebuild hotspots with source references
-- Run session-based performance collection (frames, CPU, memory, network)
+- Run session-based performance collection (frames, jank@16.67ms, rebuilds, hot functions Self>20ms, GC Top5, scroll FPS, image decode, isolate, network, memory)
+- Generate rule-engine `.ai.md` reports (runtime summary → findings → P0/P1/P2)
 - Save and compare memory snapshots
 - Execute debug actions (hot reload/restart, evaluate expression, screenshot)
 
@@ -24,27 +25,26 @@ Connect AI agents to running Flutter apps for runtime inspection, profiling, and
 ### Prerequisites
 
 - Node.js >= 18
-- A Flutter app running in `debug` or `profile` mode (recommended: `profile`)
+- A Flutter app running in `debug` or `profile` mode (recommended: `profile` for metrics; use `debug` when you need rebuild tracking)
 
-### Install and build
+### Install via npm (recommended)
+
+No local clone required:
 
 ```bash
-git clone https://github.com/draganbajic/flutter-devtools-mcp.git
-cd flutter-devtools-mcp
-npm install
-npm run build
+npx -y flutter-devtools-mcp
 ```
 
-### MCP config examples
+### MCP config (npx)
 
-#### Cursor (`.cursor/mcp.json`)
+#### Cursor (`.cursor/mcp.json` or Settings → MCP)
 
 ```json
 {
   "mcpServers": {
     "flutter-devtools": {
-      "command": "node",
-      "args": ["/path/to/flutter-devtools-mcp/dist/index.js"]
+      "command": "npx",
+      "args": ["-y", "flutter-devtools-mcp"]
     }
   }
 }
@@ -56,8 +56,8 @@ npm run build
 {
   "mcpServers": {
     "flutter-devtools": {
-      "command": "node",
-      "args": ["/path/to/flutter-devtools-mcp/dist/index.js"]
+      "command": "npx",
+      "args": ["-y", "flutter-devtools-mcp"]
     }
   }
 }
@@ -69,8 +69,8 @@ npm run build
 {
   "servers": {
     "flutter-devtools": {
-      "command": "node",
-      "args": ["/path/to/flutter-devtools-mcp/dist/index.js"]
+      "command": "npx",
+      "args": ["-y", "flutter-devtools-mcp"]
     }
   }
 }
@@ -82,8 +82,30 @@ npm run build
 {
   "mcpServers": {
     "flutter-devtools": {
+      "command": "npx",
+      "args": ["-y", "flutter-devtools-mcp"]
+    }
+  }
+}
+```
+
+### Local build (optional)
+
+```bash
+git clone https://github.com/treexi/flutter-devtools-ext.git
+cd flutter-devtools-ext/flutter-devtools-mcp
+npm install
+npm run build
+```
+
+Then point MCP at the built entry:
+
+```json
+{
+  "mcpServers": {
+    "flutter-devtools": {
       "command": "node",
-      "args": ["/path/to/flutter-devtools-mcp/dist/index.js"]
+      "args": ["/absolute/path/to/flutter-devtools-mcp/dist/index.js"]
     }
   }
 }
@@ -95,6 +117,7 @@ Start your app:
 
 ```bash
 flutter run --profile
+# or: flutter run --debug   # needed for rebuild tracking
 ```
 
 Then ask your AI assistant:
@@ -103,7 +126,7 @@ Then ask your AI assistant:
 Connect Flutter app, collect performance data for 30s (scenario: home feed scroll), and provide optimization suggestions based on code.
 ```
 
-The AI calls `collect_performance_session` (blocking for 30s), then reads `filesToInspect` and returns P0/P1/P2 suggestions.
+The AI calls `collect_performance_session` (blocking for ~30s), then reads `filesToInspect` and returns P0/P1/P2 suggestions.
 
 Design docs:
 
@@ -112,25 +135,12 @@ Design docs:
 - Doc index: [`docs/README.md`](docs/README.md)
 - Image URL sample: [`examples/app_network_image_README.md`](examples/app_network_image_README.md)
 
-## 4) Regression Commands
-
-```bash
-# Android debug regression
-npm run test:regression:android
-
-# Android profile regression (default duration)
-npm run test:regression:android:profile
-
-# Android profile regression (30s)
-npm run test:regression:android:profile:30s
-```
-
-## 5) Tool List (22)
+## 4) Tool List (22)
 
 ### Performance Session
 | Tool | Description |
 |------|-------------|
-| `collect_performance_session` | Block for N seconds (default 30), return JSON with frames/rebuilds/CPU/memory/network |
+| `collect_performance_session` | Block for N seconds (default 30), return JSON + `.ai.md`: frames/jank, rebuilds (debug), hot functions (Self>20ms), GC Top5, scroll FPS, image decode, isolate, memory, network |
 
 ### Discovery & Connection
 | Tool | Description |
@@ -181,14 +191,35 @@ npm run test:regression:android:profile:30s
 | `toggle_debug_paint` | Toggle debug paint |
 | `evaluate_expression` | Evaluate Dart expression |
 
-## 6) Recommendations and Limitations
+## 5) Recommendations and Limitations
 
 - Prefer `profile` mode for accurate performance metrics: `flutter run --profile`
-- `debug` mode adds overhead; use it for trend checks only
+- `debug` mode adds overhead; use it for trend checks and **rebuild tracking**
 - Rebuild tracking extension is unavailable in `profile` mode (auto-degraded)
-- Network capture depends on `dart:io` `HttpClient` timeline events
-- `projectTopFunctions` tracks app `lib/` methods; hit rate can be low on Android profile. Use 30~60s collection and active interactions
-- To attribute image decode to a **URL**, use the shared loader sample: [`examples/app_network_image.dart`](./examples/app_network_image.dart) (see [`examples/app_network_image_README.md`](./examples/app_network_image_README.md))
+- Network capture depends on `dart:io` `HttpClient` timeline events (and HttpProfile when available)
+- Hot functions (`projectTopFunctions`) track app `lib/` methods; on Android profile hit rate can be low — use 30~60s and keep interacting
+- Jank budget is fixed at **16.67ms** (60 FPS)
+- To attribute image decode to a **URL + ms**, use the shared loader sample: [`examples/app_network_image.dart`](./examples/app_network_image.dart) (writes `args.ms`)
+
+## 6) Publish (GitHub Actions → npm)
+
+1. Repo Settings → Secrets → Actions: create **`NPM_TOKEN`**
+   - [npm Access Tokens](https://www.npmjs.com/settings/~/tokens) → **Granular Access Token**
+   - Packages: Read and write
+   - Enable **Bypass two-factor authentication** (required for CI)
+   - Prefer enabling 2FA on the npm account first
+2. Bump & tag:
+
+```bash
+cd flutter-devtools-mcp
+npm version patch
+git push origin main --tags
+```
+
+3. GitHub → Releases → publish the tag (e.g. `v0.3.1`), or run workflow **Publish npm** manually.  
+   Workflow: [`.github/workflows/publish-npm.yml`](../.github/workflows/publish-npm.yml)
+
+Tag version (without `v`) must match `package.json` `version`.
 
 ## 7) Roadmap
 
@@ -197,12 +228,13 @@ npm run test:regression:android:profile:30s
 - [x] Network traffic inspection
 - [x] Before/after snapshot comparison
 - [x] Session-based performance collection (`collect_performance_session`)
-- [ ] Continuous monitoring mode (real-time jank watcher)
+- [x] npm publish for `npx flutter-devtools-mcp`
+- [ ] Continuous monitoring mode
 - [ ] Integration test runner with performance baselines
 - [ ] Shader compilation jank detection
-- [ ] npm publish for `npx flutter-devtools-mcp`
 
 ## 8) License
 
 MIT
 
+Flutter and Dart are trademarks of Google LLC. This project is an independent, unofficial tool that talks to apps over the Dart VM Service; it is not affiliated with, endorsed by, or part of Google or the official Flutter DevTools.

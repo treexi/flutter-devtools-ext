@@ -5,7 +5,7 @@
 # 2) Actions → Publish npm → Run workflow（可选手动填 version）
 #
 # 仓库 Secrets 需配置：
-#   NPM_TOKEN = npmjs.com 的 Automation / Publish token
+#   NPM_TOKEN = npm Granular Access Token（Packages Read+Write + Bypass 2FA）
 name: Publish npm
 
 on:

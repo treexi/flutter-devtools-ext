@@ -1,7 +1,7 @@
 {
   "name": "flutter-devtools-mcp",
   "version": "0.3.1",
-  "description": "MCP server that connects AI agents to Flutter DevTools for runtime inspection, profiling, and debugging of Flutter applications",
+  "description": "MCP server that connects AI agents to running Flutter apps via the Dart VM Service for runtime inspection, profiling, and debugging",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -20,12 +20,6 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "prepublishOnly": "npm run build",
-    "test:regression": "node scripts/regression-performance-session.mjs",
-    "test:regression:spawn": "node scripts/regression-performance-session.mjs --spawn",
-    "test:regression:android": "FLUTTER_DEVICE=android node scripts/regression-performance-session.mjs --spawn",
-    "test:regression:android:profile": "FLUTTER_DEVICE=android FLUTTER_RUN_MODE=profile node scripts/regression-performance-session.mjs --spawn",
-    "test:regression:android:profile:30s": "FLUTTER_DEVICE=android FLUTTER_RUN_MODE=profile REGRESSION_DURATION_SEC=30 node scripts/regression-performance-session.mjs --spawn",
-    "test:regression:ios": "FLUTTER_DEVICE=ios node scripts/regression-performance-session.mjs --spawn",
     "prepare": "npm run build"
   },
   "keywords": [
